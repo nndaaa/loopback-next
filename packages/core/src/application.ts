@@ -7,6 +7,7 @@ import {Context, Binding, BindingScope, Constructor} from '@loopback/context';
 import {Server} from './server';
 import {Component, mountComponent} from './component';
 import {CoreBindings} from './keys';
+import {ExtensionPoint} from './extension-point';
 
 /**
  * Application is the container for various types of artifacts, such as
@@ -212,10 +213,98 @@ export class Application extends Context {
     const instance = this.getSync(componentKey);
     mountComponent(this, instance);
   }
+
+  /**
+   * Register an extension point
+   * @param extensionPointClass Extension point class
+   * @param extensionPointName Name of the extension point, if not present,
+   * default to extensionPoints.<extensionPoint-class-name>
+   */
+  public extensionPoint(
+    // tslint:disable-next-line:no-any
+    extensionPointClass: Constructor<ExtensionPoint<any>>,
+    extensionPointName?: string,
+  ): this {
+    extensionPointName =
+      extensionPointName || `extensionPoints.${extensionPointClass.name}`;
+    this.bind(extensionPointName)
+      .toClass(extensionPointClass)
+      .inScope(BindingScope.SINGLETON)
+      .tag('extensionPoint')
+      .tag(`name:${extensionPointName}`);
+    return this;
+  }
+
+  /**
+   * Register an extension of the given extension point
+   * @param extensionPointName Name of the extension point
+   * @param extensionClass Extension class
+   * @param extensionName Name of the extension. If not present, default to
+   * the name of extension class
+   */
+  public extension(
+    extensionPointName: string,
+    // tslint:disable-next-line:no-any
+    extensionClass: Constructor<any>,
+    extensionName?: string,
+  ): this {
+    if (!this.isBound(extensionPointName)) {
+      throw new Error(`Extension point ${extensionPointName} does not exist`);
+    }
+    extensionName = extensionName || extensionClass.name;
+    this.bind(`${extensionPointName}.${extensionName}`)
+      .toClass(extensionClass)
+      .tag(`extensionPoint:${extensionPointName}`)
+      .tag(`name:${extensionName}`);
+    return this;
+  }
+
+  /**
+   * Set configuration for an extension point
+   * @param extensionPointName Name of the extension point
+   * @param config Configuration object
+   */
+  public extensionPointConfig(
+    extensionPointName: string,
+    config: object,
+  ): this {
+    // Use a corresponding binding for the extension point config
+    // Another option is to use `Binding.options()`
+    this.bind(`${extensionPointName}.config`).to(config);
+    return this;
+  }
+
+  /**
+   * Set configuration for an extension
+   * @param extensionPointName Name of the extension point
+   * @param extensionName Name of the extension
+   * @param config Configuration object
+   */
+  public extensionConfig(
+    extensionPointName: string,
+    extensionName: string,
+    config: object,
+  ): this {
+    // Use a corresponding binding for the extension config
+    // Another option is to use `Binding.options()`
+    this.bind(`${extensionPointName}.${extensionName}.config`).to(config);
+    return this;
+  }
+
+  public async getExtensionPoint(extensionPointName: string) {
+    const configKey = `${extensionPointName}.config`;
+    let config = {};
+    if (this.isBound(configKey)) {
+      config = await this.get(configKey);
+    }
+    const childContext = new Context(this);
+    childContext.bind('config').to(config);
+    return childContext.get(extensionPointName);
+  }
 }
 
 /**
- * Configuration for application
+ * Configuration for an application
  */
 export interface ApplicationConfig {
   /**
