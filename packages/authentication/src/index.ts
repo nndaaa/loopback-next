@@ -3,6 +3,7 @@
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
+export * from './authentication';
 export * from './auth-component';
 export * from './decorators/authenticate';
 export * from './keys';

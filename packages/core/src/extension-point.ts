@@ -49,7 +49,14 @@ export abstract class ExtensionPoint<EXT extends object> {
    * Find an array of bindings for extensions
    */
   getAllExtensionBindings(): Binding[] {
-    return this.context.findByTag(`extensionPoint:${this.name}`);
+    return this.context.findByTag(this.getTagForExtensions());
+  }
+
+  /**
+   * Get the binding tag for extensions of this extension point
+   */
+  protected getTagForExtensions(): string {
+    return `extensionPoint:${this.name}`;
   }
 
   /**
@@ -70,13 +77,24 @@ export abstract class ExtensionPoint<EXT extends object> {
    */
   getExtensionBinding(extensionName: string): Binding {
     const bindings = this.getAllExtensionBindings();
-    const binding = bindings.find(b => b.tags.has(`name:${extensionName}`));
+    const binding = bindings.find(b =>
+      b.tags.has(this.getTagForName(extensionName)),
+    );
     if (binding == null)
       throw new Error(
-        `Extension ${extensionName} does not exist for extension point ${this
-          .name}`,
+        `Extension ${extensionName} does not exist for extension point ${
+          this.name
+        }`,
       );
     return binding;
+  }
+
+  /**
+   * Get the binding tag for an extension name
+   * @param extensionName Name of the extension
+   */
+  protected getTagForName(extensionName: string): string {
+    return `name:${extensionName}`;
   }
 
   /**
@@ -113,5 +131,38 @@ export abstract class ExtensionPoint<EXT extends object> {
     const config = await this.getExtensionConfiguration(extensionName);
     extensionContext.bind('config').to(config);
     return binding.getValue(extensionContext);
+  }
+
+  /**
+   * Get an array of registered extension instances
+   */
+  async getAllExtensions(): Promise<EXT[]> {
+    const extensions: EXT[] = [];
+    const bindings = this.getAllExtensionBindings();
+    for (const binding of bindings) {
+      const extensionName = ExtensionPoint.getExtensionName(binding);
+      // Create a child context to bind `config`
+      const extensionContext = new Context(this.context);
+      const config = extensionName
+        ? await this.getExtensionConfiguration(extensionName)
+        : {};
+      extensionContext.bind('config').to(config);
+      const extension = await binding.getValue(extensionContext);
+      extensions.push(extension);
+    }
+    return extensions;
+  }
+
+  /**
+   * Get the name tag (name:extension-name) associated with the binding
+   * @param binding
+   */
+  static getExtensionName(binding: Binding) {
+    for (const tag of binding.tags) {
+      if (tag.startsWith('name:')) {
+        return tag.substr('name:'.length);
+      }
+    }
+    return undefined;
   }
 }
