@@ -12,7 +12,7 @@ import {
   RestComponent,
 } from '../../..';
 
-import {api, get, param} from '@loopback/openapi-v2';
+import {api, get, param} from '@loopback/openapi-v3';
 
 import {Application} from '@loopback/core';
 
@@ -20,7 +20,7 @@ import {
   ParameterObject,
   OperationObject,
   ResponseObject,
-} from '@loopback/openapi-spec';
+} from '@loopback/openapi-spec-types';
 
 import {expect, Client, createClientForHandler} from '@loopback/testlab';
 import {anOpenApiSpec, anOperationSpec} from '@loopback/openapi-spec-builder';

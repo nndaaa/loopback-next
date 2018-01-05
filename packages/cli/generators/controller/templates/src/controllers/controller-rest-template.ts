@@ -4,7 +4,7 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import {Filter, Where} from '@loopback/repository';
-import {post, param, get, put, patch, del} from '@loopback/openapi-v2';
+import {post, param, get, put, patch, del} from '@loopback/openapi-v3';
 import {inject} from '@loopback/context';
 import {<%= modelName %>} from '../models';
 import {<%= repositoryName %>} from '../repositories';

@@ -1,4 +1,4 @@
-import {post, param, get, put, patch, del} from '@loopback/openapi-v2';
+import {post, param, get, put, patch, del} from '@loopback/openapi-v3';
 import {HttpErrors} from '@loopback/rest';
 import {TodoSchema, Todo} from '../models';
 import {repository} from '@loopback/repository';

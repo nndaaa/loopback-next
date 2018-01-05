@@ -4,7 +4,7 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import {ServerRequest} from '@loopback/rest';
-import {get} from '@loopback/openapi-v2';
+import {get} from '@loopback/openapi-v3';
 import {inject} from '@loopback/context';
 
 /**
