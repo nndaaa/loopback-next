@@ -9,6 +9,7 @@ import {
   PathsObject,
 } from '@loopback/openapi-spec';
 import {
+  BindingScope,
   Context,
   Constructor,
   instantiateClass,
@@ -306,6 +307,10 @@ export class ControllerRoute extends BaseRoute {
 
   updateBindings(requestContext: Context) {
     const ctor = this._controllerCtor;
+    requestContext
+      .bind('controller.current')
+      .toClass(ctor)
+      .inScope(BindingScope.SINGLETON);
     requestContext.bind('controller.current.ctor').to(ctor);
     requestContext.bind('controller.current.operation').to(this._methodName);
   }
@@ -329,14 +334,10 @@ export class ControllerRoute extends BaseRoute {
     );
   }
 
-  private async _createControllerInstance(
+  private _createControllerInstance(
     requestContext: Context,
   ): Promise<ControllerInstance> {
-    const valueOrPromise = instantiateClass(
-      this._controllerCtor,
-      requestContext,
-    );
-    return (await Promise.resolve(valueOrPromise)) as ControllerInstance;
+    return requestContext.get('controller.current');
   }
 }
 

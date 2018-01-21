@@ -10,7 +10,13 @@ import {
   PropertyDecoratorFactory,
   MetadataMap,
 } from '@loopback/metadata';
-import {BoundValue, ValueOrPromise, resolveList} from './value-promise';
+import {
+  BoundValue,
+  ValueOrPromise,
+  isPromise,
+  resolveList,
+} from './value-promise';
+import {Binding} from './binding';
 import {Context} from './context';
 import {ResolutionSession} from './resolution-session';
 
@@ -229,6 +235,47 @@ export namespace inject {
   export const context = function injectContext() {
     return inject('', {decorator: '@inject.context'}, ctx => ctx);
   };
+
+  /**
+   * Inject an option from `options` of the parent binding. If no corresponding
+   * option value is present, `undefined` will be injected.
+   *
+   * @example
+   * ```ts
+   * class Store {
+   *   constructor(
+   *     @inject.options('x') public optionX: number,
+   *     @inject.options('y') public optionY: string,
+   *   ) { }
+   * }
+   *
+   * ctx.bind('store1').toClass(Store).withOptions({ x: 1, y: 'a' });
+   * ctx.bind('store2').toClass(Store).withOptions({ x: 2, y: 'b' });
+   *
+   *  const store1 = ctx.getSync('store1');
+   *  expect(store1.optionX).to.eql(1);
+   *  expect(store1.optionY).to.eql('a');
+
+   * const store2 = ctx.getSync('store2');
+   * expect(store2.optionX).to.eql(2);
+   * expect(store2.optionY).to.eql('b');
+   * ```
+   *
+   * @param optionPath Optional property path of the option. If is `''` or not
+   * present, the `options` object will be returned.
+   * @param metadata Optional metadata to help the injection
+   */
+  export const options = function injectOptions(
+    optionPath?: string,
+    metadata?: Object,
+  ) {
+    optionPath = optionPath || '';
+    metadata = Object.assign(
+      {optionPath, decorator: '@inject.options'},
+      metadata,
+    );
+    return inject('', metadata, resolveAsOptions);
+  };
 }
 
 function resolveAsGetter(
@@ -253,6 +300,47 @@ function resolveAsSetter(ctx: Context, injection: Injection) {
   };
 }
 
+function resolveAsOptions(
+  ctx: Context,
+  injection: Injection,
+  session?: ResolutionSession,
+) {
+  if (!(session && session.currentBinding)) {
+    // No binding is available
+    return undefined;
+  }
+
+  const meta = injection.metadata || {};
+  const options = session.currentBinding.options;
+  if (!options) return undefined;
+  const keyAndPath = Binding.parseKeyWithPath(meta.optionPath);
+  if (!keyAndPath.key) {
+    // Map array values to an object keyed by binding keys
+    const mapValues = (vals: BoundValue[]) => {
+      const obj: {
+        [name: string]: BoundValue;
+      } = {};
+      let index = 0;
+      for (const v of vals) {
+        obj[bindings[index].key] = v;
+        index++;
+      }
+      return Binding.getDeepProperty(obj, keyAndPath.path);
+    };
+    // Default to all options
+    const bindings = options.find(/.*/);
+    const result = resolveBindings(options, bindings, session);
+    if (isPromise(result)) {
+      return result.then(vals => mapValues(vals));
+    } else {
+      return mapValues(result);
+    }
+  }
+
+  if (!options.isBound(keyAndPath.key)) return undefined;
+  return options.getValueOrPromise(meta.optionPath, session);
+}
+
 /**
  * Return an array of injection objects for parameters
  * @param target The target class for constructor or static methods,
@@ -272,6 +360,18 @@ export function describeInjectedArguments(
   return meta || [];
 }
 
+function resolveBindings(
+  ctx: Context,
+  bindings: Binding[],
+  session?: ResolutionSession,
+) {
+  return resolveList(bindings, b => {
+    // We need to clone the session so that resolution of multiple bindings
+    // can be tracked in parallel
+    return b.getValue(ctx, ResolutionSession.fork(session));
+  });
+}
+
 function resolveByTag(
   ctx: Context,
   injection: Injection,
@@ -279,12 +379,7 @@ function resolveByTag(
 ) {
   const tag: string | RegExp = injection.metadata!.tag;
   const bindings = ctx.findByTag(tag);
-
-  return resolveList(bindings, b => {
-    // We need to clone the session so that resolution of multiple bindings
-    // can be tracked in parallel
-    return b.getValue(ctx, ResolutionSession.fork(session));
-  });
+  return resolveBindings(ctx, bindings, session);
 }
 
 /**

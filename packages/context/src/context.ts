@@ -468,10 +468,10 @@ export class Context {
     }
 
     if (isPromise(boundValue)) {
-      return boundValue.then(v => getDeepProperty(v, path));
+      return boundValue.then(v => Binding.getDeepProperty(v, path));
     }
 
-    return getDeepProperty(boundValue, path);
+    return Binding.getDeepProperty(boundValue, path);
   }
 
   /**
