@@ -16,20 +16,22 @@ import {
   OperationObject,
   ParameterLocation,
   ParameterObject,
+  ParameterType,
   SchemaObject,
   ServerObject,
-  ParameterType,
   PathsObject,
-  ItemType,
-  ItemsObject,
   MapObject,
   ComponentsObject,
   ReferenceObject,
   isSchemaObject,
+  RequestBodyObject,
+  ItemType,
+  ItemsObject,
 } from '@loopback/openapi-spec-types';
 import {getJsonSchema, JsonDefinition} from '@loopback/repository-json-schema';
 import * as _ from 'lodash';
 import * as stream from 'stream';
+import {inspect} from 'util';
 
 const debug = require('debug')('loopback:rest:router:metadata');
 
@@ -38,6 +40,7 @@ const REST_METHODS_WITH_PARAMETERS_KEY = 'rest:methods:parameters';
 const REST_PARAMETERS_KEY = 'rest:parameters';
 const REST_CLASS_KEY = 'rest:class';
 const REST_CONTROLLER_SPEC_KEY = 'rest:controller-spec';
+const REST_REQUEST_BODY_KEY = 'rest:request-body';
 
 // tslint:disable:no-any
 
@@ -117,6 +120,7 @@ function resolveControllerSpec(constructor: Function): ControllerSpec {
     ) || {};
 
   endpoints = DecoratorFactory.cloneDeep(endpoints);
+  console.log(`endpoints: ${endpoints}`);
   for (const op in endpoints) {
     debug('  processing method %s', op);
 
@@ -176,6 +180,26 @@ function resolveControllerSpec(constructor: Function): ControllerSpec {
        */
       operationSpec.parameters = params.filter(p => p != null);
     }
+    debug('  processing requestBody for method %s', op);
+    let requestBodies = MetadataInspector.getAllParameterMetadata<
+      RequestBodyObject
+    >(REST_REQUEST_BODY_KEY, constructor.prototype, op);
+    let requestBody: RequestBodyObject;
+    // workaround
+    console.log(`bodies: ${requestBodies}`);
+    if (requestBodies) {
+      if (requestBodies.length > 1)
+        throw new Error(
+          'An operation should only have one parameter decorated by @requestBody',
+        );
+      requestBody = requestBodies[0];
+      debug('  requestBody for method %s: %j', op, requestBody);
+      console.log(`requestBody + ${requestBody}`);
+      if (requestBody) {
+        operationSpec.requestBody = requestBody;
+      }
+    }
+
     operationSpec['x-operation-name'] = op;
 
     if (!spec.paths[path]) {
@@ -189,6 +213,7 @@ function resolveControllerSpec(constructor: Function): ControllerSpec {
 
     debug(`  adding ${endpointName}`, operationSpec);
     spec.paths[path][verb] = operationSpec;
+    console.log(`path spec: ${inspect(spec.paths[path][verb])}`);
 
     debug(`  inferring schema object for method %s`, op);
     const paramTypes = MetadataInspector.getDesignTypeForMethod(
@@ -463,6 +488,34 @@ function getSchemaForBodyParam(type: Function): SchemaObject {
 }
 
 /**
+ * Describe the request body of a Controller method parameter.
+ *
+ * @param requestBodySpec
+ */
+export function requestBody(requestBodySpec?: Partial<RequestBodyObject>) {
+  return function(target: Object, member: string | symbol, index: number) {
+    // Use 'application/json' as default content if `requestBody` is undefined
+    requestBodySpec = requestBodySpec || {content: {}};
+    if (_.isEmpty(requestBodySpec.content))
+      requestBodySpec.content = {'application/json': {}};
+
+    const methodSig = MetadataInspector.getDesignTypeForMethod(target, member);
+    const paramTypes = (methodSig && methodSig.parameterTypes) || [];
+    let paramType = paramTypes[index];
+    let schema = getSchemaForBodyParam(paramType);
+    requestBodySpec.content = _.mapValues(requestBodySpec.content, c => {
+      c.schema = c.schema || schema;
+      return c;
+    });
+
+    ParameterDecoratorFactory.createDecorator<RequestBodyObject>(
+      REST_REQUEST_BODY_KEY,
+      requestBodySpec as RequestBodyObject,
+    )(target, member, index);
+  };
+}
+
+/**
  * Describe an input parameter of a Controller method.
  *
  * `@param` can be applied to method itself or specific parameters. For example,
@@ -514,15 +567,8 @@ export function param(paramSpec: ParameterObject) {
 
       let paramType = paramTypes[descriptorOrIndex];
       if (paramType) {
-        if (paramSpec.in !== 'body') {
-          if (!paramSpec.type) {
-            paramSpec.type = getTypeForNonBodyParam(paramType);
-          }
-        } else {
-          paramSpec.schema = Object.assign(
-            getSchemaForBodyParam(paramType),
-            paramSpec.schema,
-          );
+        if (!paramSpec.type) {
+          paramSpec.type = getTypeForNonBodyParam(paramType);
         }
       }
 
@@ -666,40 +712,6 @@ export namespace param {
     boolean: createParamShortcut('path', 'boolean'),
   };
 
-  export const formData = {
-    /**
-     * Define a parameter of "string" type that's read
-     * from a field in the request body.
-     *
-     * @param name Parameter name.
-     */
-    string: createParamShortcut('formData', 'string'),
-
-    /**
-     * Define a parameter of "number" type that's read
-     * from a field in the request body.
-     *
-     * @param name Parameter name.
-     */
-    number: createParamShortcut('formData', 'number'),
-
-    /**
-     * Define a parameter of "integer" type that's read
-     * from a field in the request body.
-     *
-     * @param name Parameter name.
-     */
-    integer: createParamShortcut('formData', 'integer'),
-
-    /**
-     * Define a parameter of "boolean" type that's read
-     * from a field in the request body.
-     *
-     * @param name Parameter name.
-     */
-    boolean: createParamShortcut('formData', 'boolean'),
-  };
-
   /**
    * Define a parameter that's set to the full request body.
    *
@@ -735,7 +747,7 @@ export namespace param {
     itemSpec: ItemType | ItemsObject,
   ) {
     const items = typeof itemSpec === 'string' ? {type: itemSpec} : itemSpec;
-    if (source !== 'body') {
+    if (source !== 'cookie') {
       return param({name, in: source, type: 'array', items});
     } else {
       return param({name, in: source, schema: {type: 'array', items}});

@@ -371,4 +371,6 @@ describe('Routing metadata', () => {
       in: 'query',
     });
   });
+
+  it('returns "parameters" and "requestBody" in openapi 3.0.0 spec', () => {});
 });

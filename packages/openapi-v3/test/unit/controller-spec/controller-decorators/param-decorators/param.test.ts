@@ -29,7 +29,9 @@ describe('Routing metadata for parameters', () => {
     it('defines a new parameter', () => {
       const paramSpec: ParameterObject = {
         name: 'name',
-        type: 'string',
+        schema: {
+          type: 'string',
+        },
         in: 'query',
       };
 
@@ -75,11 +77,6 @@ describe('Routing metadata for parameters', () => {
           vip: boolean,
           @param.array('tags', 'query', {type: 'string'})
           tags: string[],
-          @param({
-            name: 'picture',
-            in: 'body',
-          })
-          picture: stream.Readable,
         ) {}
       }
 
@@ -114,13 +111,6 @@ describe('Routing metadata for parameters', () => {
             type: 'string',
           },
           in: 'query',
-        })
-        .withParameter({
-          name: 'picture',
-          schema: {
-            type: 'file',
-          },
-          in: 'body',
         })
         .build();
 
@@ -221,180 +211,6 @@ describe('Routing metadata for parameters', () => {
         .build();
 
       expect(actualSpec.paths['/greet']['get']).to.eql(expectedSpec);
-    });
-
-    it('infers simple body parameter type', () => {
-      const paramSpec: ParameterObject = {
-        name: 'name',
-        in: 'body',
-      };
-
-      class MyController {
-        @get('/greet')
-        greet(@param(paramSpec) name: string) {}
-      }
-
-      const actualSpec = getControllerSpec(MyController);
-
-      const expectedSpec = anOperationSpec()
-        .withOperationName('greet')
-        .withParameter({
-          name: 'name',
-          schema: {
-            type: 'string',
-          },
-          in: 'body',
-        })
-        .build();
-
-      expect(actualSpec.paths['/greet']['get']).to.eql(expectedSpec);
-    });
-
-    it('infers complex body parameter type', () => {
-      const paramSpec: ParameterObject = {
-        name: 'name',
-        in: 'body',
-      };
-
-      class MyBody {
-        name: string;
-      }
-
-      class MyController {
-        @get('/greet')
-        greet(@param(paramSpec) name: MyBody) {}
-      }
-
-      const actualSpec = getControllerSpec(MyController);
-
-      const expectedSpec = anOperationSpec()
-        .withOperationName('greet')
-        .withParameter({
-          name: 'name',
-          schema: {
-            $ref: '#/components/schemas/MyBody',
-          },
-          in: 'body',
-        })
-        .build();
-
-      expect(actualSpec.paths['/greet']['get']).to.eql(expectedSpec);
-    });
-
-    it('infers complex body parameter schema into the controller spec', () => {
-      const fooSpec: ParameterObject = {
-        name: 'foo',
-        in: 'body',
-      };
-      const barSpec: ParameterObject = {
-        name: 'bar',
-        in: 'body',
-      };
-      @model()
-      class Foo {
-        @property() price: number;
-      }
-      @model()
-      class Bar {
-        @property() name: string;
-        @property() foo: Foo;
-      }
-      class MyController {
-        @post('/foo')
-        foo(@param(fooSpec) foo: Foo) {}
-
-        @post('/bar')
-        bar(@param(barSpec) bar: Bar) {}
-      }
-      const components = getControllerSpec(MyController).components;
-      const defs = components && components.schemas;
-      // tslint:disable-next-line:no-any
-      expect(defs).to.have.keys('Foo', 'Bar');
-      expect(defs && defs.Foo).to.deepEqual({
-        title: 'Foo',
-        properties: {
-          price: {
-            type: 'number',
-          },
-        },
-      });
-      expect(defs && defs.Bar).to.deepEqual({
-        title: 'Bar',
-        properties: {
-          name: {
-            type: 'string',
-          },
-          foo: {
-            $ref: '#components/schemas/Foo',
-          },
-        },
-      });
-    });
-
-    it('does not produce nested definitions', () => {
-      const paramSpec: ParameterObject = {
-        name: 'foo',
-        in: 'body',
-      };
-      @model()
-      class Foo {
-        @property() bar: number;
-      }
-      @model()
-      class MyBody {
-        @property() name: string;
-        @property() foo: Foo;
-      }
-      class MyController {
-        @post('/foo')
-        foo(@param(paramSpec) body: MyBody) {}
-      }
-
-      const components = getControllerSpec(MyController).components;
-      const defs = components && components.schemas;
-      expect(defs).to.have.keys('MyBody', 'Foo');
-      expect(defs && defs.MyBody).to.not.have.key('definitions');
-    });
-
-    it('infers no properties if no property metadata is present', () => {
-      const paramSpec: ParameterObject = {
-        name: 'foo',
-        in: 'body',
-      };
-      @model()
-      class MyBody {
-        name: string;
-      }
-      class MyController {
-        @post('/foo')
-        foo(@param(paramSpec) foo: MyBody) {}
-      }
-
-      const components = getControllerSpec(MyController).components;
-      const defs = components && components.schemas;
-
-      expect(defs).to.have.key('MyBody');
-      expect(defs && defs.MyBody).to.not.have.key('properties');
-    });
-
-    it('does not infer definition if no class metadata is present', () => {
-      const paramSpec: ParameterObject = {
-        name: 'foo',
-        in: 'body',
-      };
-      class MyBody {
-        @property() name: string;
-      }
-      class MyController {
-        @post('/foo')
-        foo(@param(paramSpec) foo: MyBody) {}
-      }
-
-      const components = getControllerSpec(MyController).components;
-      const defs = components && components.schemas;
-
-      expect(defs).to.have.key('MyBody');
-      expect(defs && defs.MyBody).to.deepEqual({});
     });
 
     it('can define multiple parameters in order', () => {

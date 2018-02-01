@@ -23,16 +23,15 @@
     "prepublishOnly": "npm run build && npm run build:apidocs",
     "pretest": "npm run build:current",
     "test": "lb-mocha \"DIST/test/unit/**/*.js\"",
-    "verify": "npm pack && tar xf loopback-openapi-v2*.tgz && tree package && npm run clean"
+    "verify":
+      "npm pack && tar xf loopback-openapi-v2*.tgz && tree package && npm run clean",
+    "single":
+      "npm run build && lb-mocha \"DIST/test/unit/**/request-body.test.js\""
   },
   "author": "IBM",
   "copyright.owner": "IBM Corp.",
   "license": "MIT",
-  "keywords": [
-    "Swagger",
-    "OpenAPI Spec",
-    "TypeScript"
-  ],
+  "keywords": ["Swagger", "OpenAPI Spec", "TypeScript"],
   "files": [
     "README.md",
     "index.js",

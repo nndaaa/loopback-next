@@ -22,15 +22,15 @@ export type ExtensionValue = any;
 
 /**
  * The location of a parameter.
- * Possible values are "query", "header", "path", "formData" or "body".
+ * Possible values are "query", "header", "path" or "body".
  * <p>Specification:
- * https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#parameterIn
+ * https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md
+ * search "The location of the parameter"
  */
 export type ParameterLocation =
   | 'query'
   | 'header'
   | 'path'
-  | 'formData'
   | 'body';
 
 export type ParameterType =
