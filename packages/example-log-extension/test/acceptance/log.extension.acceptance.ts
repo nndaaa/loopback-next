@@ -21,7 +21,6 @@ import {
 } from '@loopback/rest';
 import {
   LogComponent,
-  LogActionProvider,
   LogLevelMixin,
   LOG_LEVEL,
   log,
@@ -40,6 +39,9 @@ import {Context, inject} from '@loopback/context';
 import chalk from 'chalk';
 
 const SequenceActions = RestBindings.SequenceActions;
+
+import {createLogSpy, restoreLogSpy} from '../log-spy';
+import {logToMemory, resetLogs} from '../in-memory-logger';
 
 describe('log extension acceptance test', () => {
   let app: LogApp;
@@ -67,9 +69,10 @@ describe('log extension acceptance test', () => {
   beforeEach(createApp);
   beforeEach(createController);
   beforeEach(createSequence);
-  beforeEach(createLogSpy);
 
-  afterEach(restoreLogSpy);
+  beforeEach(resetLogs);
+  beforeEach(() => (spy = createLogSpy()));
+  afterEach(() => restoreLogSpy(spy));
 
   it('logs information at DEBUG or higher', async () => {
     setAppLogToDebug();
@@ -243,6 +246,7 @@ describe('log extension acceptance test', () => {
     });
 
     app.bind(EXAMPLE_LOG_BINDINGS.TIMER).to(timer);
+    app.bind(EXAMPLE_LOG_BINDINGS.LOGGER).to(logToMemory);
     server = await app.getServer(RestServer);
   }
 
@@ -316,13 +320,5 @@ describe('log extension acceptance test', () => {
   function timer(startTime?: HighResTime): HighResTime {
     if (!startTime) return [3, 3];
     return [2, 2];
-  }
-
-  function createLogSpy() {
-    spy = sinon.spy(LogActionProvider.prototype, 'log');
-  }
-
-  function restoreLogSpy() {
-    spy.restore();
   }
 });
