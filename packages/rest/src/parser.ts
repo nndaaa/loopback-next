@@ -83,15 +83,7 @@ function loadRequestBodyIfNeeded(
 }
 
 function hasArgumentsFromBody(operationSpec: OperationObject): boolean {
-  if (!operationSpec.parameters || !operationSpec.parameters.length)
-    return false;
-
-  for (const paramSpec of operationSpec.parameters) {
-    if ('$ref' in paramSpec) continue;
-    const source = (paramSpec as ParameterObject).in;
-    if (source === 'formData' || source === 'body') return true;
-  }
-  return false;
+  return !!operationSpec.requestBody;
 }
 
 function buildOperationArguments(
@@ -109,6 +101,7 @@ function buildOperationArguments(
       throw new Error('$ref parameters are not supported yet.');
     }
     const spec = paramSpec as ParameterObject;
+    // how do we know the argument sequence?
     switch (spec.in) {
       case 'query':
         args.push(request.query[spec.name]);
@@ -119,12 +112,15 @@ function buildOperationArguments(
       case 'header':
         args.push(request.headers[spec.name.toLowerCase()]);
         break;
-      case 'formData':
+      case 'cookie':
         args.push(body ? body[spec.name] : undefined);
         break;
-      case 'body':
-        args.push(body);
-        break;
+      // case 'formData':
+      //   args.push(body ? body[spec.name] : undefined);
+      //   break;
+      // case 'body':
+      //   args.push(body);
+      //   break;
       default:
         throw new HttpErrors.NotImplemented(
           'Parameters with "in: ' + spec.in + '" are not supported yet.',

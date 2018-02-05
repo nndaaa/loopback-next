@@ -27,19 +27,169 @@ export type ExtensionValue = any;
  * https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md
  * search "The location of the parameter"
  */
-export type ParameterLocation =
-  | 'query'
-  | 'header'
-  | 'path'
-  | 'body';
+export type ParameterLocation = 'query' | 'header' | 'path' | 'cookie';
 
-export type ParameterType =
-  | 'string'
-  | 'number'
-  | 'integer'
-  | 'boolean'
-  | 'array'
-  | 'file';
+export type ParamterStyle =
+  | 'matrix'
+  | 'label'
+  | 'form'
+  | 'simple'
+  | 'spaceDelimited'
+  | 'pipeDelimited'
+  | 'deepObject';
+
+/**
+ * The internal type of the array. The value MUST be one of "string",
+ * "number", "integer", "boolean", or "array". Files and models are not
+ * allowed.
+ */
+export type ItemType = 'string' | 'number' | 'integer' | 'boolean' | 'array';
+
+/**
+ * A limited subset of JSON-Schema's items object. It is used by parameter
+ * definitions that are not located in "body". Please note it only differs
+ * from SimpleType with parameter types excluding `file`.
+ */
+export interface ItemsObject extends JSONType {
+  type: ItemType;
+}
+
+/**
+ * JSON type - This is part of the Schema object.
+ * The following properties are taken directly from the JSON Schema
+ * definition and follow the same specifications.
+ * See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schema-object
+ */
+
+export type JSONType = {
+  title?: string;
+  multipleOf?: number;
+  maximum?: number;
+  exclusiveMaximum?: number;
+  minimum?: number;
+  exclusiveMinimum?: number;
+  maxLength?: number;
+  minLength?: number;
+  // (This string SHOULD be a valid regular expression, according to the ECMA 262 regular expression dialect)
+  pattern?: string;
+  maxItems?: number;
+  minItems?: number;
+  uniqueItems?: boolean;
+  maxProperties?: number;
+  minProperties?: number;
+  required?: boolean;
+  enum?: Array<ExtensionValue>;
+};
+
+export interface RequestBodyObject extends ISpecificationExtension {
+  description?: string;
+  content: ContentObject;
+  required?: boolean;
+}
+
+export interface ContentObject {
+  [mediatype: string]: MediaTypeObject;
+}
+export interface MediaTypeObject extends ISpecificationExtension {
+  schema?: SchemaObject | ReferenceObject;
+  examples?: [ExampleObject | ReferenceObject];
+  example?: ExampleObject | ReferenceObject;
+  encoding?: EncodingObject;
+}
+
+export interface EncodingObject extends ISpecificationExtension {
+  // [property: string]: EncodingPropertyObject;
+  [property: string]: EncodingPropertyObject | any; // Hack for allowing ISpecificationExtension
+}
+export interface EncodingPropertyObject {
+  contentType?: string;
+  headers?: {[key: string]: HeaderObject | ReferenceObject};
+  style?: string;
+  explode?: boolean;
+  allowReserved?: boolean;
+  [key: string]: any; // (any) = Hack for allowing ISpecificationExtension
+}
+export interface HeaderObject extends ParameterObject {}
+
+export interface ParameterObject extends ISpecificationExtension {
+  name: string;
+  in: string; // "query" | "header" | "path" | "cookie";
+  description?: string;
+  required?: boolean;
+  deprecated?: boolean;
+  allowEmptyValue?: boolean;
+
+  style?: string; // "matrix" | "label" | "form" | "simple" | "spaceDelimited" | "pipeDelimited" | "deepObject";
+  explode?: boolean;
+  allowReserved?: boolean;
+  schema?: SchemaObject | ReferenceObject;
+  examples?: {[param: string]: ExampleObject | ReferenceObject};
+  example?: any;
+  content?: ContentObject;
+}
+
+export interface ExampleObject {
+  summary?: string;
+  description?: string;
+  value?: any;
+  externalValue?: string;
+  [property: string]: any; // Hack for allowing ISpecificationExtension
+}
+
+export interface ReferenceObject {
+  $ref: string;
+}
+
+export interface SchemaObject extends JSONType, OAS3SchemaObject {}
+
+export interface DiscriminatorObject {
+  propertyName: string;
+  mapping?: {[key: string]: string};
+}
+
+export interface XmlObject extends ISpecificationExtension {
+  name?: string;
+  namespace?: string;
+  prefix?: string;
+  attribute?: boolean;
+  wrapped?: boolean;
+}
+
+export interface ExternalDocumentationObject extends ISpecificationExtension {
+  description?: string;
+  url: string;
+}
+
+export interface OAS3SchemaObject extends ISpecificationExtension {
+  nullable?: boolean;
+  discriminator?: DiscriminatorObject;
+  readOnly?: boolean;
+  writeOnly?: boolean;
+  xml?: XmlObject;
+  externalDocs?: ExternalDocumentationObject;
+  example?: any;
+  examples?: any[];
+  deprecated?: boolean;
+
+  type?: string;
+  allOf?: (SchemaObject | ReferenceObject)[];
+  oneOf?: (SchemaObject | ReferenceObject)[];
+  anyOf?: (SchemaObject | ReferenceObject)[];
+  not?: SchemaObject | ReferenceObject;
+  items?: SchemaObject | ReferenceObject;
+  properties?: {[propertyName: string]: SchemaObject | ReferenceObject};
+  additionalProperties?: SchemaObject | ReferenceObject;
+  description?: string;
+  format?: string;
+  default?: any;
+}
+
+//  Specification Extensions
+//   ^x-
+export interface ISpecificationExtension {
+  // Cannot constraint to "^x-" but can filter them later to access to them
+  [extensionName: string]: any;
+}
 
 /**
  * Maps names to a given type of values
@@ -56,7 +206,7 @@ export interface MapObject<T> {
  */
 export interface ScopesObject
   extends MapObject<string>,
-    OAS3.ISpecificationExtension {
+    ISpecificationExtension {
   /**
    * Maps between a name of a scope to a short description of it (as the value
    * of the property).
@@ -123,7 +273,7 @@ export interface ResponsesDefinitionsObject
  */
 export interface ResponsesObject
   extends MapObject<OAS3.ResponseObject | OAS3.ReferenceObject | undefined>,
-    OAS3.ISpecificationExtension {
+    ISpecificationExtension {
   /**
    * The documentation of responses other than the ones declared for specific
    * HTTP response codes. It can be used to cover undeclared responses.
@@ -161,142 +311,21 @@ export interface PathsObject
     | ExtensionValue;
 }
 
-/**
- * Simple type - primitive types or array of such types. It is used by parameter
- * definitions that are not located in "body".
- */
-export interface SimpleType {
-  /**
-   * The type of the parameter. Since the parameter is not located at
-   * the request body, it is limited to simple types (that is, not an object).
-   * The value MUST be one of "string", "number", "integer", "boolean",
-   * "array" or "file". If type is "file", the `consumes` MUST be either
-   * "multipart/form-data", " application/x-www-form-urlencoded" or both
-   * and the parameter MUST be `in` "formData".
-   */
-  type?: ParameterType;
+// /**
+//  * The internal type of the array. The value MUST be one of "string",
+//  * "number", "integer", "boolean", or "array". Files and models are not
+//  * allowed.
+//  */
+// export type ItemType = 'string' | 'number' | 'integer' | 'boolean' | 'array';
 
-  /**
-   * The extending format for the previously mentioned type. See
-   * [Data Type Formats](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#dataTypeFormat)
-   * for further details.
-   */
-  format?: string;
-
-  /**
-   * Sets the ability to pass empty-valued parameters. This is valid only for
-   * either query or formData parameters and allows you to send a parameter
-   * with a name only or an empty value. Default value is false.
-   */
-  allowEmptyValue?: boolean;
-
-  /**
-   * Required if type is "array". Describes the type of items in the array.
-   */
-  items?: ItemsObject;
-
-  /**
-   * Determines the format of the array if type array is used. Possible values
-   * are:
-   *   - csv: comma separated values foo,bar.
-   *   - ssv: space separated values foo bar.
-   *   - tsv: tab separated values foo\tbar.
-   *   - pipes: pipe separated values foo|bar.
-   *   - multi: corresponds to multiple parameter instances instead of multiple
-   *     values for a single instance foo=bar&foo=baz. This is valid only for
-   *     parameters in "query" or "formData".
-   *
-   * Default value is csv.
-   */
-  collectionFormat?: string;
-
-  /**
-   * Declares the value of the parameter that the server will use if none is
-   * provided, for example a "count" to control the number of results per page
-   * might default to 100 if not supplied by the client in the request. (Note:
-   * "default" has no meaning for required parameters.) See
-   * https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-6.2.
-   * Unlike JSON Schema this value MUST conform to the defined type for this
-   * parameter.
-   */
-  default?: ExtensionValue;
-
-  /**
-   * See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.1.2.
-   */
-  maximum?: number;
-
-  /**
-   * See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.1.2.
-   */
-  exclusiveMaximum?: number;
-
-  /**
-   * See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.1.3.
-   */
-  minimum?: number;
-
-  /**
-   * See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.1.3.
-   */
-  exclusiveMinimum?: number;
-
-  /**
-   * See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.2.1.
-   */
-  maxLength?: number;
-
-  /**
-   * See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.2.2.
-   */
-  minLength?: number;
-
-  /**
-   * See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.2.3.
-   */
-  pattern?: string;
-
-  /**
-   * See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.3.2.
-   */
-  maxItems?: number;
-
-  /**
-   * See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.3.3.
-   */
-  minItems?: number;
-
-  /**
-   * See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.3.4.
-   */
-  uniqueItems?: boolean;
-
-  /**
-   * See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.5.1.
-   */
-  enum?: Array<ExtensionValue>;
-
-  /**
-   * See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.1.1.
-   */
-  multipleOf?: number;
-}
-
-/**
- * The internal type of the array. The value MUST be one of "string",
- * "number", "integer", "boolean", or "array". Files and models are not
- * allowed.
- */
-export type ItemType = 'string' | 'number' | 'integer' | 'boolean' | 'array';
-
-/**
- * A limited subset of JSON-Schema's items object. It is used by parameter
- * definitions that are not located in "body". Please note it only differs
- * from SimpleType with parameter types excluding `file`.
- */
-export interface ItemsObject extends SimpleType {
-  type: ItemType;
-}
+// /**
+//  * A limited subset of JSON-Schema's items object. It is used by parameter
+//  * definitions that are not located in "body". Please note it only differs
+//  * from SimpleType with parameter types excluding `file`.
+//  */
+// export interface ItemsObject extends SimpleType {
+//   type: ItemType;
+// }
 
 /**
  * Create an empty OpenApiSpec object that's still a valid openapi document.
