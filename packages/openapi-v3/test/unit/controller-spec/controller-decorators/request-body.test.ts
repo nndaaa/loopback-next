@@ -3,7 +3,13 @@
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
-import {post, requestBody, getControllerSpec} from '../../../../..';
+import {
+  post,
+  requestBody,
+  getControllerSpec,
+  Integer,
+  Float,
+} from '../../../..';
 import {expect} from '@loopback/testlab';
 import {model, property} from '@loopback/repository';
 import * as stream from 'stream';
@@ -54,6 +60,8 @@ describe('Routing metadata for request body', () => {
           greetWithFile(@requestBody() name: stream.Readable) {}
           @post('/greetingWithObject')
           greetWitObejct(@requestBody() name: object) {}
+          @post('/greetingWithInteger')
+          greetWithInteger(@requestBody() name: Integer) {}
         }
 
         const actualSpec = getControllerSpec(MyController);
@@ -85,17 +93,18 @@ describe('Routing metadata for request body', () => {
             },
           },
         };
-        const expectedContentWithFile = {
-          'application/json': {
-            schema: {
-              type: 'file',
-            },
-          },
-        };
         const expectedContentWithObject = {
           'application/json': {
             schema: {
               type: 'object',
+            },
+          },
+        };
+        const expectedContentWithInteger = {
+          'application/json': {
+            schema: {
+              type: 'integer',
+              format: 'int32',
             },
           },
         };
@@ -113,11 +122,15 @@ describe('Routing metadata for request body', () => {
           actualSpec.paths['/greetingWithArray']['post'].requestBody.content,
         ).to.eql(expectedContentWithArray);
         expect(
-          actualSpec.paths['/greetingWithFile']['post'].requestBody.content,
-        ).to.eql(expectedContentWithFile);
-        expect(
           actualSpec.paths['/greetingWithObject']['post'].requestBody.content,
         ).to.eql(expectedContentWithObject);
+        expect(
+          actualSpec.paths['/greetingWithInteger']['post'].requestBody.content,
+        ).to.eql(expectedContentWithInteger);
+
+        // For review
+        let a: Float = 2;
+        expect(typeof a).to.equal('number');
       });
       it('infers request body with complex type', () => {
         const expectedContent = {
@@ -156,6 +169,9 @@ describe('Routing metadata for request body', () => {
       });
       it('does not infer definition if no class metadata is present', () => {
         // TBD after addressing comment
+      });
+      it('does not detect type when requestBodySpec contains "type"', () => {
+        // TBD
       });
       it('schema in requestBody overrides the generated schema', () => {
         const expectedContent = {

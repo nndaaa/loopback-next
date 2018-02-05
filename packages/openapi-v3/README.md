@@ -2,8 +2,8 @@
 
 This package contains:
 
-- Decorators that describe LoopBack artifacts as OpenAPI v2 (Swagger) metadata.
-- Utilities that transfer LoopBack metadata to OpenAPI v2 (Swagger) swagger specifications. 
+* Decorators that describe LoopBack artifacts as OpenAPI v2 (Swagger) metadata.
+* Utilities that transfer LoopBack metadata to OpenAPI v2 (Swagger) swagger specifications.
 
 ## Overview
 
@@ -30,33 +30,34 @@ import {api, getControllerSpec} from '@loopback/openapi-v3';
 
 @api(somePathSpec)
 class MyController {
-    greet() {
-        return 'Hello world!';
-    }
+  greet() {
+    return 'Hello world!';
+  }
 }
 
 const myControllerSpec = getControllerSpec(MyController);
 ```
 
 then the `myControllerSpec` will be:
+
 ```js
 {
     swagger: '2.0',
     basePath: '/',
     info: { title: 'LoopBack Application', version: '1.0.0' },
-    paths: { 
-        '/greet': { 
+    paths: {
+        '/greet': {
             get: {
-                responses:  { 
-                    '200': { 
-                        description: 'The string result.', 
-                        schema: { type: 'string' } 
-                    } 
+                responses:  {
+                    '200': {
+                        description: 'The string result.',
+                        schema: { type: 'string' }
+                    }
                 },
-                'x-operation-name': 'greet' 
+                'x-operation-name': 'greet'
             }
-        } 
-    } 
+        }
+    }
 }
 ```
 
@@ -82,3 +83,52 @@ See [all contributors](https://github.com/strongloop/loopback-next/graphs/contri
 # License
 
 MIT
+
+# Migration
+
+### requestBody
+
+#### in
+
+* swagger
+
+If in is "body": schema
+If in is any value other than "body": type
+
+* openapi
+
+#### style
+
+in --> default style
+
+Describes how the parameter value will be serialized depending on the type of the parameter value. Default values (based on value of in): for query - form; for path - simple; for header - simple; for cookie - form.
+
+type validation: https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#style-values
+
+* does validator verify it
+* if not validate them in decorator
+* simple/spaceDelimited/pipeDelimited only supports array
+* deepObject only support object
+
+#### name:
+
+If in is "path", the name field MUST correspond to the associated path segment from the path field in the Paths Object. See Path Templating for further information.
+If in is "header" and the name field is "Accept", "Content-Type" or "Authorization", the parameter definition SHALL be ignored.
+
+* may affect rest server
+
+#### format:
+
+* Shall we change primitive shortcut to openapi3's format common name?
+
+Primitives have an optional modifier property: format
+
+search "The formats defined by the OAS are"
+
+### server
+
+### response spec
+
+### validator
+
+### components/schemas

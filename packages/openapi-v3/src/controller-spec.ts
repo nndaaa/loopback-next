@@ -16,7 +16,6 @@ import {
   OperationObject,
   ParameterLocation,
   ParameterObject,
-  ParameterType,
   SchemaObject,
   ServerObject,
   PathsObject,
@@ -222,8 +221,7 @@ function resolveControllerSpec(constructor: Function): ControllerSpec {
     ).parameterTypes;
 
     const isComplexType = (ctor: Function) =>
-      !_.includes([String, Number, Boolean, Array, Object], ctor) &&
-      !isReadableStream(ctor);
+      !_.includes([String, Number, Boolean, Array, Object], ctor);
 
     for (const p of paramTypes) {
       if (isComplexType(p)) {
@@ -428,65 +426,76 @@ export function operation(verb: string, path: string, spec?: OperationObject) {
 
 const paramDecoratorStyle = Symbol('ParamDecoratorStyle');
 
-/**
- * Check if the given type is `stream.Readable` or a subclasses of
- * `stream.Readable`
- * @param type JavaScript type function
- */
-function isReadableStream(type: Object): boolean {
-  if (typeof type !== 'function') return false;
-  if (type === stream.Readable) return true;
-  return isReadableStream(Object.getPrototypeOf(type));
-}
+// export them from openapi-spec-types
+export class Integer extends Number {}
+export class Long extends Number {}
+export class Float extends Number {}
+export class Double extends Number {}
+export class Byte extends String {}
+export class Binary extends String {}
+export class Date extends String {}
+export class DateTime extends String {}
+export class Password extends String {}
 
-/**
- * Get openapi type name for a JavaScript type
- * @param type JavaScript type
- */
-function getTypeForNonBodyParam(type: Function): ParameterType {
-  if (type === String) {
-    return 'string';
-  } else if (type === Number) {
-    return 'number';
-  } else if (type === Boolean) {
-    return 'boolean';
-  } else if (type === Array) {
-    return 'array';
-  } else if (isReadableStream(type)) {
-    return 'file';
-  }
-  return 'string';
-}
+const typeAndFormatMap = {
+  integer: {type: 'integer', format: 'int32'},
+  long: {type: 'integer', format: 'int64'},
+  float: {type: 'number', format: 'float'},
+  double: {type: 'number', format: 'double'},
+  byte: {type: 'string', format: 'byte'},
+  binary: {type: 'string', format: 'binary'},
+  date: {type: 'string', format: 'date'},
+  dateTime: {type: 'string', format: 'date-time'},
+  password: {type: 'string', format: 'password'},
+};
 
 /**
  * Get openapi schema for a JavaScript type for a body parameter
  * @param type JavaScript type
  */
-function getSchemaForBodyParam(type: Function): SchemaObject {
-  const schema: SchemaObject = {};
-  let typeName;
-  if (type === String) {
-    typeName = 'string';
-  } else if (type === Number) {
-    typeName = 'number';
-  } else if (type === Boolean) {
-    typeName = 'boolean';
-  } else if (type === Array) {
-    // item type cannot be inspected
-    typeName = 'array';
-  } else if (isReadableStream(type)) {
-    typeName = 'file';
-  } else if (type === Object) {
-    typeName = 'object';
-  }
-  if (typeName) {
-    schema.type = typeName;
-  } else {
-    schema.$ref = '#/components/schemas/' + type.name;
-  }
+function getSchemaForRequestBody(type: Function): SchemaObject {
+  let schema = getSchemaForParam(type);
+  if (!schema.type) schema.$ref = '#/components/schemas/' + type.name;
   return schema;
 }
 
+function getSchemaForParam(type: Function): SchemaObject {
+  const schema: SchemaObject = {};
+  let typeAndFormat: any = {};
+  if (type === String) {
+    typeAndFormat.type = 'string';
+  } else if (type === Number) {
+    typeAndFormat.type = 'number';
+  } else if (type === Boolean) {
+    typeAndFormat.type = 'boolean';
+  } else if (type === Array) {
+    // item type cannot be inspected
+    typeAndFormat.type = 'array';
+  } else if (type === Object) {
+    typeAndFormat.type = 'object';
+  } else if (type === Integer) {
+    typeAndFormat = typeAndFormatMap.integer;
+  } else if (type === Long) {
+    typeAndFormat = typeAndFormatMap.long;
+  } else if (type === Float) {
+    typeAndFormat = typeAndFormatMap.float;
+  } else if (type === Double) {
+    typeAndFormat = typeAndFormatMap.double;
+  } else if (type === Byte) {
+    typeAndFormat = typeAndFormatMap.byte;
+  } else if (type === Binary) {
+    typeAndFormat = typeAndFormatMap.binary;
+  } else if (type === Date) {
+    typeAndFormat = typeAndFormatMap.date;
+  } else if (type === DateTime) {
+    typeAndFormat = typeAndFormatMap.dateTime;
+  } else if (type === Password) {
+    typeAndFormat = typeAndFormatMap.password;
+  }
+  if (typeAndFormat.type) schema.type = typeAndFormat.type;
+  if (typeAndFormat.format) schema.format = typeAndFormat.format;
+  return schema;
+}
 /**
  * Describe the request body of a Controller method parameter.
  *
@@ -502,7 +511,7 @@ export function requestBody(requestBodySpec?: Partial<RequestBodyObject>) {
     const methodSig = MetadataInspector.getDesignTypeForMethod(target, member);
     const paramTypes = (methodSig && methodSig.parameterTypes) || [];
     let paramType = paramTypes[index];
-    let schema = getSchemaForBodyParam(paramType);
+    let schema = getSchemaForRequestBody(paramType);
     requestBodySpec.content = _.mapValues(requestBodySpec.content, c => {
       c.schema = c.schema || schema;
       return c;
@@ -545,7 +554,8 @@ export function param(paramSpec: ParameterObject) {
   return function(
     target: Object,
     member: string | symbol,
-    descriptorOrIndex: TypedPropertyDescriptor<any> | number,
+    // deprecate method level decorator
+    index: number,
   ) {
     paramSpec = paramSpec || {};
     // Get the design time method parameter metadata
@@ -553,211 +563,38 @@ export function param(paramSpec: ParameterObject) {
     const paramTypes = (methodSig && methodSig.parameterTypes) || [];
 
     const targetWithParamStyle = target as any;
-    if (typeof descriptorOrIndex === 'number') {
-      if (targetWithParamStyle[paramDecoratorStyle] === 'method') {
-        // This should not happen as parameter decorators are applied before
-        // the method decorator
-        /* istanbul ignore next */
-        throw new Error(
-          'Mixed usage of @param at method/parameter level' +
-            ' is not allowed.',
-        );
-      }
-      // Map design-time parameter type to the OpenAPI param type
+    // Map design-time parameter type to the OpenAPI param type
 
-      let paramType = paramTypes[descriptorOrIndex];
-      if (paramType) {
-        if (!paramSpec.type) {
-          paramSpec.type = getTypeForNonBodyParam(paramType);
-        }
+    let paramType = paramTypes[index];
+    if (paramType) {
+      if (!paramSpec.type) {
+        paramSpec.schema = getSchemaForParam(paramType);
       }
-
-      if (
-        paramSpec.type === 'array' ||
-        (paramSpec.schema &&
-          isSchemaObject(paramSpec.schema) &&
-          paramSpec.schema.type === 'array')
-      ) {
-        paramType = paramTypes[descriptorOrIndex];
-        // The design-time type is `Object` for `any`
-        if (paramType != null && paramType !== Object && paramType !== Array) {
-          throw new Error(
-            `The parameter type is set to 'array' but the JavaScript type is ${
-              paramType.name
-            }`,
-          );
-        }
-      }
-      targetWithParamStyle[paramDecoratorStyle] = 'parameter';
-      ParameterDecoratorFactory.createDecorator<ParameterObject>(
-        REST_PARAMETERS_KEY,
-        paramSpec,
-      )(target, member, descriptorOrIndex);
-    } else {
-      if (targetWithParamStyle[paramDecoratorStyle] === 'parameter') {
-        throw new Error(
-          'Mixed usage of @param at method/parameter level' +
-            ' is not allowed.',
-        );
-      }
-      targetWithParamStyle[paramDecoratorStyle] = 'method';
-      RestMethodParameterDecoratorFactory.createDecorator<ParameterObject>(
-        REST_METHODS_WITH_PARAMETERS_KEY,
-        paramSpec,
-      )(target, member, descriptorOrIndex);
     }
+
+    if (
+      paramSpec.schema &&
+      isSchemaObject(paramSpec.schema) &&
+      paramSpec.schema.type === 'array'
+    ) {
+      paramType = paramTypes[index];
+      // The design-time type is `Object` for `any`
+      if (paramType != null && paramType !== Object && paramType !== Array) {
+        throw new Error(
+          `The parameter type is set to 'array' but the JavaScript type is ${
+            paramType.name
+          }`,
+        );
+      }
+    }
+    targetWithParamStyle[paramDecoratorStyle] = 'parameter';
+    ParameterDecoratorFactory.createDecorator<ParameterObject>(
+      REST_PARAMETERS_KEY,
+      paramSpec,
+    )(target, member, index);
   };
 }
 
 class RestMethodParameterDecoratorFactory extends MethodParameterDecoratorFactory<
   ParameterObject
 > {}
-
-export namespace param {
-  export const query = {
-    /**
-     * Define a parameter of "string" type that's read from the query string.
-     *
-     * @param name Parameter name.
-     */
-    string: createParamShortcut('query', 'string'),
-
-    /**
-     * Define a parameter of "number" type that's read from the query string.
-     *
-     * @param name Parameter name.
-     */
-    number: createParamShortcut('query', 'number'),
-
-    /**
-     * Define a parameter of "integer" type that's read from the query string.
-     *
-     * @param name Parameter name.
-     */
-    integer: createParamShortcut('query', 'integer'),
-
-    /**
-     * Define a parameter of "boolean" type that's read from the query string.
-     *
-     * @param name Parameter name.
-     */
-    boolean: createParamShortcut('query', 'boolean'),
-  };
-
-  export const header = {
-    /**
-     * Define a parameter of "string" type that's read from a request header.
-     *
-     * @param name Parameter name, it must match the header name
-     *   (e.g. `Content-Type`).
-     */
-    string: createParamShortcut('header', 'string'),
-
-    /**
-     * Define a parameter of "number" type that's read from a request header.
-     *
-     * @param name Parameter name, it must match the header name
-     *   (e.g. `Content-Length`).
-     */
-    number: createParamShortcut('header', 'number'),
-
-    /**
-     * Define a parameter of "integer" type that's read from a request header.
-     *
-     * @param name Parameter name, it must match the header name
-     *   (e.g. `Content-Length`).
-     */
-    integer: createParamShortcut('header', 'integer'),
-
-    /**
-     * Define a parameter of "boolean" type that's read from a request header.
-     *
-     * @param name Parameter name, it must match the header name,
-     *   (e.g. `DNT` or `X-Do-Not-Track`).
-     */
-    boolean: createParamShortcut('header', 'boolean'),
-  };
-
-  export const path = {
-    /**
-     * Define a parameter of "string" type that's read from request path.
-     *
-     * @param name Parameter name matching one of the placeholders in the path
-     *   string.
-     */
-    string: createParamShortcut('path', 'string'),
-
-    /**
-     * Define a parameter of "number" type that's read from request path.
-     *
-     * @param name Parameter name matching one of the placeholders in the path
-     *   string.
-     */
-    number: createParamShortcut('path', 'number'),
-
-    /**
-     * Define a parameter of "integer" type that's read from request path.
-     *
-     * @param name Parameter name matching one of the placeholders in the path
-     *   string.
-     */
-    integer: createParamShortcut('path', 'integer'),
-
-    /**
-     * Define a parameter of "boolean" type that's read from request path.
-     *
-     * @param name Parameter name matching one of the placeholders in the path
-     *   string.
-     */
-    boolean: createParamShortcut('path', 'boolean'),
-  };
-
-  /**
-   * Define a parameter that's set to the full request body.
-   *
-   * @param name Parameter name
-   * @param schema The schema defining the type used for the body parameter.
-   */
-  export const body = function(
-    name: string,
-    schema?: SchemaObject | ReferenceObject,
-  ) {
-    return param({name, in: 'body', schema});
-  };
-
-  /**
-   * Define a parameter of `array` type
-   *
-   * @example
-   * ```ts
-   * export class MyController {
-   *   @get('/greet')
-   *   greet(@param.array('names', 'query', 'string') names: string[]): string {
-   *     return `Hello, ${names}`;
-   *   }
-   * }
-   * ```
-   * @param name Parameter name
-   * @param source Source of the parameter value
-   * @param itemSpec Item type for the array or the full item object
-   */
-  export const array = function(
-    name: string,
-    source: ParameterLocation,
-    itemSpec: ItemType | ItemsObject,
-  ) {
-    const items = typeof itemSpec === 'string' ? {type: itemSpec} : itemSpec;
-    if (source !== 'cookie') {
-      return param({name, in: source, type: 'array', items});
-    } else {
-      return param({name, in: source, schema: {type: 'array', items}});
-    }
-  };
-}
-
-function createParamShortcut(source: ParameterLocation, type: ParameterType) {
-  // TODO(bajtos) @param.IN.TYPE('foo', {required: true})
-  return (name: string) => {
-    return param({name, in: source, type});
-  };
-}
