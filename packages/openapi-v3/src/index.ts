@@ -4,3 +4,7 @@
 // License text available at https://opensource.org/licenses/MIT
 
 export * from './controller-spec';
+export * from './json-to-schema';
+export * from './generate-schema';
+export * from './request-body-decorator';
+export * from './parameter-decorator';

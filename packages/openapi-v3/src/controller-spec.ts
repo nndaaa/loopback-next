@@ -12,6 +12,7 @@ import {
   MethodParameterDecoratorFactory,
 } from '@loopback/context';
 
+import {jsonToSchemaObject} from '../';
 import {
   OperationObject,
   ParameterLocation,
@@ -35,7 +36,6 @@ import {inspect} from 'util';
 const debug = require('debug')('loopback:rest:router:metadata');
 
 const REST_METHODS_KEY = 'rest:methods';
-const REST_METHODS_WITH_PARAMETERS_KEY = 'rest:methods:parameters';
 const REST_PARAMETERS_KEY = 'rest:parameters';
 const REST_CLASS_KEY = 'rest:class';
 const REST_CONTROLLER_SPEC_KEY = 'rest:controller-spec';
@@ -151,19 +151,8 @@ function resolveControllerSpec(constructor: Function): ControllerSpec {
       constructor.prototype,
       op,
     );
-    if (params == null) {
-      params = MetadataInspector.getMethodMetadata<ParameterObject[]>(
-        REST_METHODS_WITH_PARAMETERS_KEY,
-        constructor.prototype,
-        op,
-      );
-    }
     debug('  parameters for method %s: %j', op, params);
     if (params != null) {
-      const bodyParams = params.filter(p => p && p.in === 'body');
-      if (bodyParams.length > 1) {
-        throw new Error('More than one body parameters found: ' + bodyParams);
-      }
       params = DecoratorFactory.cloneDeep(params);
       /**
        * If a controller method uses dependency injection, the parameters
@@ -269,82 +258,6 @@ export function getControllerSpec(constructor: Function): ControllerSpec {
   return spec;
 }
 
-export function jsonToSchemaObject(jsonDef: JsonDefinition): SchemaObject {
-  const json = jsonDef as {[name: string]: any}; // gets around index signature error
-  const result: SchemaObject = {};
-  const propsToIgnore = [
-    'anyOf',
-    'oneOf',
-    'additionalItems',
-    'defaultProperties',
-    'typeof',
-  ];
-  for (const property in json) {
-    if (propsToIgnore.includes(property)) {
-      continue;
-    }
-    switch (property) {
-      case 'type': {
-        if (json.type === 'array' && !json.items) {
-          throw new Error(
-            '"items" property must be present if "type" is an array',
-          );
-        }
-        result.type = Array.isArray(json.type) ? json.type[0] : json.type;
-        break;
-      }
-      case 'allOf': {
-        result.allOf = _.map(json.allOf, item => jsonToSchemaObject(item));
-        break;
-      }
-      case 'properties': {
-        result.properties = _.mapValues(json.properties, item =>
-          jsonToSchemaObject(item),
-        );
-        break;
-      }
-      case 'additionalProperties': {
-        if (typeof json.additionalProperties !== 'boolean') {
-          result.additionalProperties = jsonToSchemaObject(
-            json.additionalProperties as JsonDefinition,
-          );
-        }
-        break;
-      }
-      case 'items': {
-        const items = Array.isArray(json.items) ? json.items[0] : json.items;
-        result.items = jsonToSchemaObject(items as JsonDefinition);
-        break;
-      }
-      case 'enum': {
-        const newEnum = [];
-        const primitives = ['string', 'number', 'boolean'];
-        for (const element of json.enum) {
-          if (primitives.includes(typeof element) || element === null) {
-            newEnum.push(element);
-          } else {
-            // if element is JsonDefinition, convert to SchemaObject
-            newEnum.push(jsonToSchemaObject(element as JsonDefinition));
-          }
-        }
-        result.enum = newEnum;
-
-        break;
-      }
-      case '$ref': {
-        result.$ref = json.$ref.replace('#definitions', '#components/schemas');
-        break;
-      }
-      default: {
-        result[property] = json[property];
-        break;
-      }
-    }
-  }
-
-  return result;
-}
-
 /**
  * Expose a Controller method as a REST API operation
  * mapped to `GET` request method.
@@ -422,177 +335,6 @@ export function operation(verb: string, path: string, spec?: OperationObject) {
       spec,
     },
   );
-}
-
-const paramDecoratorStyle = Symbol('ParamDecoratorStyle');
-
-// export them from openapi-spec-types
-export class Integer extends Number {}
-export class Long extends Number {}
-export class Float extends Number {}
-export class Double extends Number {}
-export class Byte extends String {}
-export class Binary extends String {}
-export class Date extends String {}
-export class DateTime extends String {}
-export class Password extends String {}
-
-const typeAndFormatMap = {
-  integer: {type: 'integer', format: 'int32'},
-  long: {type: 'integer', format: 'int64'},
-  float: {type: 'number', format: 'float'},
-  double: {type: 'number', format: 'double'},
-  byte: {type: 'string', format: 'byte'},
-  binary: {type: 'string', format: 'binary'},
-  date: {type: 'string', format: 'date'},
-  dateTime: {type: 'string', format: 'date-time'},
-  password: {type: 'string', format: 'password'},
-};
-
-/**
- * Get openapi schema for a JavaScript type for a body parameter
- * @param type JavaScript type
- */
-function getSchemaForRequestBody(type: Function): SchemaObject {
-  let schema = getSchemaForParam(type);
-  if (!schema.type) schema.$ref = '#/components/schemas/' + type.name;
-  return schema;
-}
-
-function getSchemaForParam(type: Function): SchemaObject {
-  const schema: SchemaObject = {};
-  let typeAndFormat: any = {};
-  if (type === String) {
-    typeAndFormat.type = 'string';
-  } else if (type === Number) {
-    typeAndFormat.type = 'number';
-  } else if (type === Boolean) {
-    typeAndFormat.type = 'boolean';
-  } else if (type === Array) {
-    // item type cannot be inspected
-    typeAndFormat.type = 'array';
-  } else if (type === Object) {
-    typeAndFormat.type = 'object';
-  } else if (type === Integer) {
-    typeAndFormat = typeAndFormatMap.integer;
-  } else if (type === Long) {
-    typeAndFormat = typeAndFormatMap.long;
-  } else if (type === Float) {
-    typeAndFormat = typeAndFormatMap.float;
-  } else if (type === Double) {
-    typeAndFormat = typeAndFormatMap.double;
-  } else if (type === Byte) {
-    typeAndFormat = typeAndFormatMap.byte;
-  } else if (type === Binary) {
-    typeAndFormat = typeAndFormatMap.binary;
-  } else if (type === Date) {
-    typeAndFormat = typeAndFormatMap.date;
-  } else if (type === DateTime) {
-    typeAndFormat = typeAndFormatMap.dateTime;
-  } else if (type === Password) {
-    typeAndFormat = typeAndFormatMap.password;
-  }
-  if (typeAndFormat.type) schema.type = typeAndFormat.type;
-  if (typeAndFormat.format) schema.format = typeAndFormat.format;
-  return schema;
-}
-/**
- * Describe the request body of a Controller method parameter.
- *
- * @param requestBodySpec
- */
-export function requestBody(requestBodySpec?: Partial<RequestBodyObject>) {
-  return function(target: Object, member: string | symbol, index: number) {
-    // Use 'application/json' as default content if `requestBody` is undefined
-    requestBodySpec = requestBodySpec || {content: {}};
-    if (_.isEmpty(requestBodySpec.content))
-      requestBodySpec.content = {'application/json': {}};
-
-    const methodSig = MetadataInspector.getDesignTypeForMethod(target, member);
-    const paramTypes = (methodSig && methodSig.parameterTypes) || [];
-    let paramType = paramTypes[index];
-    let schema = getSchemaForRequestBody(paramType);
-    requestBodySpec.content = _.mapValues(requestBodySpec.content, c => {
-      c.schema = c.schema || schema;
-      return c;
-    });
-
-    ParameterDecoratorFactory.createDecorator<RequestBodyObject>(
-      REST_REQUEST_BODY_KEY,
-      requestBodySpec as RequestBodyObject,
-    )(target, member, index);
-  };
-}
-
-/**
- * Describe an input parameter of a Controller method.
- *
- * `@param` can be applied to method itself or specific parameters. For example,
- * ```
- * class MyController {
- *   @get('/')
- *   @param(offsetSpec)
- *   @param(pageSizeSpec)
- *   list(offset?: number, pageSize?: number) {}
- * }
- * ```
- * or
- * ```
- * class MyController {
- *   @get('/')
- *   list(
- *     @param(offsetSpec) offset?: number,
- *     @param(pageSizeSpec) pageSize?: number,
- *   ) {}
- * }
- * ```
- * Please note mixed usage of `@param` at method/parameter level is not allowed.
- *
- * @param paramSpec Parameter specification.
- */
-export function param(paramSpec: ParameterObject) {
-  return function(
-    target: Object,
-    member: string | symbol,
-    // deprecate method level decorator
-    index: number,
-  ) {
-    paramSpec = paramSpec || {};
-    // Get the design time method parameter metadata
-    const methodSig = MetadataInspector.getDesignTypeForMethod(target, member);
-    const paramTypes = (methodSig && methodSig.parameterTypes) || [];
-
-    const targetWithParamStyle = target as any;
-    // Map design-time parameter type to the OpenAPI param type
-
-    let paramType = paramTypes[index];
-    if (paramType) {
-      if (!paramSpec.type) {
-        paramSpec.schema = getSchemaForParam(paramType);
-      }
-    }
-
-    if (
-      paramSpec.schema &&
-      isSchemaObject(paramSpec.schema) &&
-      paramSpec.schema.type === 'array'
-    ) {
-      paramType = paramTypes[index];
-      // The design-time type is `Object` for `any`
-      if (paramType != null && paramType !== Object && paramType !== Array) {
-        throw new Error(
-          `The parameter type is set to 'array' but the JavaScript type is ${
-            paramType.name
-          }`,
-        );
-      }
-    }
-    targetWithParamStyle[paramDecoratorStyle] = 'parameter';
-    ParameterDecoratorFactory.createDecorator<ParameterObject>(
-      REST_PARAMETERS_KEY,
-      paramSpec,
-    )(target, member, index);
-  };
 }
 
 class RestMethodParameterDecoratorFactory extends MethodParameterDecoratorFactory<

@@ -88,6 +88,10 @@ MIT
 
 ### requestBody
 
+### param
+
+#### deprecate method level decorator
+
 #### in
 
 * swagger
