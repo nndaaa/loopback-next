@@ -119,7 +119,7 @@ function resolveControllerSpec(constructor: Function): ControllerSpec {
     ) || {};
 
   endpoints = DecoratorFactory.cloneDeep(endpoints);
-  console.log(`endpoints: ${endpoints}`);
+  // console.log(`endpoints: ${endpoints}`);
   for (const op in endpoints) {
     debug('  processing method %s', op);
 
@@ -174,7 +174,7 @@ function resolveControllerSpec(constructor: Function): ControllerSpec {
     >(REST_REQUEST_BODY_KEY, constructor.prototype, op);
     let requestBody: RequestBodyObject;
     // workaround
-    console.log(`bodies: ${requestBodies}`);
+    // console.log(`bodies: ${requestBodies}`);
     if (requestBodies) {
       if (requestBodies.length > 1)
         throw new Error(
@@ -182,7 +182,7 @@ function resolveControllerSpec(constructor: Function): ControllerSpec {
         );
       requestBody = requestBodies[0];
       debug('  requestBody for method %s: %j', op, requestBody);
-      console.log(`requestBody + ${requestBody}`);
+      // console.log(`requestBody + ${requestBody}`);
       if (requestBody) {
         operationSpec.requestBody = requestBody;
       }
@@ -201,7 +201,7 @@ function resolveControllerSpec(constructor: Function): ControllerSpec {
 
     debug(`  adding ${endpointName}`, operationSpec);
     spec.paths[path][verb] = operationSpec;
-    console.log(`path spec: ${inspect(spec.paths[path][verb])}`);
+    // console.log(`path spec: ${inspect(spec.paths[path][verb])}`);
 
     debug(`  inferring schema object for method %s`, op);
     const paramTypes = MetadataInspector.getDesignTypeForMethod(

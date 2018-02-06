@@ -1,6 +1,7 @@
 import {RequestBodyObject, isSchemaObject} from '@loopback/openapi-spec-types';
 import {MetadataInspector, ParameterDecoratorFactory} from '@loopback/context';
 import {getSchemaForRequestBody} from '../';
+import * as _ from 'lodash';
 
 const REST_REQUEST_BODY_KEY = 'rest:request-body';
 /**

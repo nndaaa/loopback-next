@@ -1,4 +1,4 @@
-import {SchemaObject} from '@loopback/openapi-spec-types';
+import {SchemaObject, isSchemaObject} from '@loopback/openapi-spec-types';
 
 // export them from openapi-spec-types
 export class Integer extends Number {}
@@ -23,8 +23,12 @@ const typeAndFormatMap = {
   password: {type: 'string', format: 'password'},
 };
 
-export function getSchemaForParam(type: Function): SchemaObject {
-  const schema: SchemaObject = {};
+export function getSchemaForParam(
+  type: Function,
+  schema: SchemaObject,
+): SchemaObject {
+  if (isSchemaObject(schema) && schema.type && schema.format) return schema;
+
   let typeAndFormat: any = {};
   if (type === String) {
     typeAndFormat.type = 'string';
@@ -56,8 +60,9 @@ export function getSchemaForParam(type: Function): SchemaObject {
   } else if (type === Password) {
     typeAndFormat = typeAndFormatMap.password;
   }
-  if (typeAndFormat.type) schema.type = typeAndFormat.type;
-  if (typeAndFormat.format) schema.format = typeAndFormat.format;
+  if (typeAndFormat.type && !schema.type) schema.type = typeAndFormat.type;
+  if (typeAndFormat.format && !schema.format)
+    schema.format = typeAndFormat.format;
   return schema;
 }
 
@@ -66,7 +71,8 @@ export function getSchemaForParam(type: Function): SchemaObject {
  * @param type JavaScript type
  */
 export function getSchemaForRequestBody(type: Function): SchemaObject {
-  let schema = getSchemaForParam(type);
-  if (!schema.type) schema.$ref = '#/components/schemas/' + type.name;
-  return schema;
+  let generatedSchema = getSchemaForParam(type, {});
+  if (!generatedSchema.type)
+    generatedSchema.$ref = '#/components/schemas/' + type.name;
+  return generatedSchema;
 }

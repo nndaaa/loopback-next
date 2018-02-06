@@ -11,6 +11,7 @@ import {
   ResponseObject,
   ParameterObject,
   createEmptyApiSpec,
+  RequestBodyObject,
 } from '@loopback/openapi-spec-types';
 
 /**
@@ -155,6 +156,11 @@ export class OperationSpecBuilder extends BuilderBase<OperationObject> {
   withParameter(parameterSpec: ParameterObject): this {
     if (!this._spec.parameters) this._spec.parameters = [];
     this._spec.parameters.push(parameterSpec);
+    return this;
+  }
+
+  withRequestBody(requestBodySpec: RequestBodyObject): this {
+    this._spec.requestBody = requestBodySpec;
     return this;
   }
 

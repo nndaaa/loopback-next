@@ -62,6 +62,7 @@ describe('Routing metadata for request body', () => {
           greetWitObejct(@requestBody() name: object) {}
           @post('/greetingWithInteger')
           greetWithInteger(@requestBody() name: Integer) {}
+          // more primitive type test cases to be added
         }
 
         const actualSpec = getControllerSpec(MyController);

@@ -15,3 +15,7 @@ export function isSchemaObject(
 ): schema is SchemaObject {
   return !schema.hasOwnProperty('$ref');
 }
+
+export function isReferenceObject(obj: any): obj is ReferenceObject {
+  return obj.hasOwnProperty('$ref');
+}

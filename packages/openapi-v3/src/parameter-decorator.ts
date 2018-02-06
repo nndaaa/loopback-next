@@ -1,4 +1,10 @@
-import {ParameterObject, isSchemaObject} from '@loopback/openapi-spec-types';
+import {
+  ParameterObject,
+  isSchemaObject,
+  SchemaObject,
+  ReferenceObject,
+  ParameterLocation,
+} from '@loopback/openapi-spec-types';
 import {MetadataInspector, ParameterDecoratorFactory} from '@loopback/context';
 import {getSchemaForParam} from '../';
 
@@ -47,21 +53,26 @@ export function param(paramSpec: ParameterObject) {
     // Map design-time parameter type to the OpenAPI param type
 
     let paramType = paramTypes[index];
+
     if (paramType) {
       if (
         !paramSpec.schema ||
         (isSchemaObject(paramSpec.schema) && !paramSpec.schema.type)
       ) {
-        paramSpec.schema = getSchemaForParam(paramType);
+        paramSpec.schema = getSchemaForParam(paramType, paramSpec.schema || {});
       }
     }
+    targetWithParamStyle[paramDecoratorStyle] = 'parameter';
+    ParameterDecoratorFactory.createDecorator<ParameterObject>(
+      REST_PARAMETERS_KEY,
+      paramSpec,
+    )(target, member, index);
 
     if (
       paramSpec.schema &&
       isSchemaObject(paramSpec.schema) &&
       paramSpec.schema.type === 'array'
     ) {
-      paramType = paramTypes[index];
       // The design-time type is `Object` for `any`
       if (paramType != null && paramType !== Object && paramType !== Array) {
         throw new Error(
@@ -71,10 +82,19 @@ export function param(paramSpec: ParameterObject) {
         );
       }
     }
-    targetWithParamStyle[paramDecoratorStyle] = 'parameter';
-    ParameterDecoratorFactory.createDecorator<ParameterObject>(
-      REST_PARAMETERS_KEY,
-      paramSpec,
-    )(target, member, index);
+  };
+}
+
+export namespace param {
+  export const array = function(
+    name: string,
+    source: ParameterLocation,
+    itemSpec: SchemaObject | ReferenceObject,
+  ) {
+    return param({
+      name,
+      in: source,
+      schema: {type: 'array', items: itemSpec},
+    });
   };
 }
