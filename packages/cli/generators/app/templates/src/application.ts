@@ -11,14 +11,8 @@ import {MySequence} from './sequence';
 export class <%= project.applicationName %> extends Application {
   constructor(options?: ApplicationConfig) {
     // Allow options to replace the defined components array, if desired.
-    options = Object.assign(
-      {},
-      {
-        components: [RestComponent],
-      },
-      options,
-    );
     super(options);
+    this.component(RestComponent);
     this.server(RestServer);
     this.setupControllers();
   }
