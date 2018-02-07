@@ -158,13 +158,12 @@ import {MySequence} from './sequence';
 class MyApp extends Application {
   constructor() {
     super({
-      components: [AuthenticationComponent, RestComponent],
       rest: {
         sequence: MySequence
       },
-      controllers: [MyController],
     });
 
+    this.components([AuthenticationComponent, RestComponent]);
     this.controller(MyController);
   }
 

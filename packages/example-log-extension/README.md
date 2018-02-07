@@ -35,10 +35,10 @@ import {
 class LogApp extends LogLevelMixin(Application) {
   constructor() {
     super({
-      components: [RestComponent, LogComponent],
       logLevel: LOG_LEVEL.ERROR,
-      controllers: [MyController]
     });
+    this.components(RestComponent, LogComponent)
+    this.controller(MyController);
   };
 }
 

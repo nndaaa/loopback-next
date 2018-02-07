@@ -29,11 +29,8 @@ Here's a basic "Hello World" application using `@loopback/core` and
   import {Application} from '@loopback/core';
   import {RestComponent, RestServer} from '@loopback/rest';
 
-  const app = new Application({
-    components: [
-      RestComponent,
-    ]
-  });
+  const app = new Application();
+  app.component(RestComponent);
 
   (async function start() {
     const rest = await app.getServer(RestServer);
@@ -51,13 +48,11 @@ Application options.
 
 ```ts
   const app = new Application({
-    components: [
-      RestComponent,
-    ],
     rest: {
       port: 3001
     }
   });
+  app.components(RestComponent);
 ```
 
 ### `rest` options
