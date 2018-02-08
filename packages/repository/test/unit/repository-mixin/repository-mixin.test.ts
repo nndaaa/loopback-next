@@ -34,6 +34,15 @@ describe('RepositoryMixin', () => {
     expectNoteRepoToBeBound(myApp);
   });
 
+  it('binds an array of repositories from app.repository()', () => {
+    const myApp = new AppWithRepoMixin();
+
+    expectNoteRepoToNotBeBound(myApp);
+    myApp.repository([NoteRepo, MoreNoteRepo]);
+    expectNoteRepoToBeBound(myApp);
+    expectMoreNoteRepoToBeBound(myApp);
+  });
+
   it('binds user defined component without repository', () => {
     class EmptyTestComponent {}
 
@@ -52,6 +61,21 @@ describe('RepositoryMixin', () => {
 
     myApp.component(TestComponent);
 
+    expectComponentToBeBound(myApp, TestComponent);
+    expectNoteRepoToBeBound(myApp);
+  });
+
+  it('binds an array of components and sets up their repositories', () => {
+    class EmptyTestComponent {}
+
+    const myApp = new AppWithRepoMixin();
+    const boundComponentsBefore = myApp.find('components.*').map(b => b.key);
+    expect(boundComponentsBefore).to.be.empty();
+    expectNoteRepoToNotBeBound(myApp);
+
+    myApp.component([EmptyTestComponent, TestComponent]);
+
+    expectComponentToBeBound(myApp, EmptyTestComponent);
     expectComponentToBeBound(myApp, TestComponent);
     expectNoteRepoToBeBound(myApp);
   });
@@ -85,6 +109,8 @@ describe('RepositoryMixin', () => {
     }
   }
 
+  class MoreNoteRepo extends NoteRepo {}
+
   class TestComponent {
     repositories = [NoteRepo];
   }
@@ -94,6 +120,13 @@ describe('RepositoryMixin', () => {
     expect(boundRepositories).to.containEql('repositories.NoteRepo');
     const repoInstance = myApp.getSync('repositories.NoteRepo');
     expect(repoInstance).to.be.instanceOf(NoteRepo);
+  }
+
+  function expectMoreNoteRepoToBeBound(myApp: Application) {
+    const boundRepositories = myApp.find('repositories.*').map(b => b.key);
+    expect(boundRepositories).to.containEql('repositories.MoreNoteRepo');
+    const repoInstance = myApp.getSync('repositories.MoreNoteRepo');
+    expect(repoInstance).to.be.instanceOf(MoreNoteRepo);
   }
 
   function expectNoteRepoToNotBeBound(myApp: Application) {
