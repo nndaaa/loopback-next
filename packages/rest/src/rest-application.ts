@@ -32,8 +32,13 @@ export class RestApplication extends Application {
     this.component(RestComponent);
   }
 
-  server(server: Constructor<Server>, name?: string): Binding {
-    if (this.findByTag('server').length > 0) {
+  server(server: Constructor<Server>, name?: string): Binding;
+  server(servers: Constructor<Server>[]): Binding[];
+  server(
+    server: Constructor<Server> | Constructor<Server>[],
+    name?: string,
+  ): Binding | Binding[] {
+    if (this.findByTag('server').length > 0 || Array.isArray(server)) {
       throw new Error(ERR_NO_MULTI_SERVER);
     }
     return super.server(server, name);

@@ -90,7 +90,7 @@ describe('Basic Authentication', () => {
 
   async function givenAServer() {
     app = new Application();
-    app.components([AuthenticationComponent, RestComponent]);
+    app.component([AuthenticationComponent, RestComponent]);
     server = await app.getServer(RestServer);
   }
 

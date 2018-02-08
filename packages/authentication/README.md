@@ -163,7 +163,7 @@ class MyApp extends Application {
       },
     });
 
-    this.components([AuthenticationComponent, RestComponent]);
+    this.component([AuthenticationComponent, RestComponent]);
     this.controller(MyController);
   }
 

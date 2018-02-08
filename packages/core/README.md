@@ -46,7 +46,7 @@ const app = new Application({
     port: 3001,
   },
 });
-app.components([
+app.component([
   RestComponent, // REST Server
   GrpcComponent, // GRPC Server
   ]);

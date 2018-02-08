@@ -239,7 +239,7 @@ describe('log extension acceptance test', () => {
 
   async function createApp() {
     app = new LogApp();
-    app.components([RestComponent, LogComponent]);
+    app.component([RestComponent, LogComponent]);
 
     app.bind(EXAMPLE_LOG_BINDINGS.TIMER).to(timer);
     server = await app.getServer(RestServer);

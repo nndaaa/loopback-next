@@ -26,10 +26,11 @@ export class Application extends Context {
   }
 
   /**
-   * Register a controller class with this application.
+   * Register a controller class or an array of controller classes
+   * with this application.
    *
    * @param controllerCtor {Function} The controller class
-   * (constructor function).
+   * (constructor function) or an array of.
    * @param {string=} name Optional controller name, default to the class name
    * @return {Binding} The newly created binding, you can use the reference to
    * further modify the binding, e.g. lock the value to prevent further
@@ -41,39 +42,25 @@ export class Application extends Context {
    * app.controller(MyController).lock();
    * ```
    */
-  controller(controllerCtor: ControllerClass, name?: string): Binding {
-    name = name || controllerCtor.name;
-    return this.bind(`controllers.${name}`)
-      .toClass(controllerCtor)
-      .tag('controller');
+  controller(controllerCtor: ControllerClass, name?: string): Binding;
+  controller(ctors: ControllerClass[]): Binding[];
+  controller(
+    ctor: ControllerClass | ControllerClass[],
+    name?: string,
+  ): Binding | Binding[] {
+    if (!Array.isArray(ctor)) {
+      name = name || ctor.name;
+      return this.bind(`controllers.${name}`)
+        .toClass(ctor)
+        .tag('controller');
+    } else {
+      return ctor.map(ctrl => this.controller(ctrl));
+    }
   }
 
   /**
-   * Bind an array of controllers to the Application's master
-   * context.
-   * Each controller added in this way will automatically be named based on
-   * the class constructor name with the "controllers." prefix.
-   *
-   * If you wish to control the binding keys for particular controller
-   * instances, use the app.controller function instead.
-   * ```ts
-   * app.controllers([
-   *  FooController,
-   *  BarController,
-   * ]);
-   * // Creates a binding for "controllers.FooController" and a binding for
-   * // "controllers.BarController";
-   * ```
-   *
-   * @param ctors Array of controller classes.
-   * @returns {Binding[]} An array of bindings for the registered controllers.
-   */
-  controllers(ctors: ControllerClass[]): Binding[] {
-    return ctors.map(ctor => this.controller(ctor));
-  }
-
-  /**
-   * Bind a Server constructor to the Application's master context.
+   * Bind a Server constructor or an array of Server constructors
+   * to the Application's master context.
    * Each server constructor added in this way must provide a unique prefix
    * to prevent binding overlap.
    *
@@ -89,41 +76,22 @@ export class Application extends Context {
    * @returns {Binding} Binding for the server class
    * @memberof Application
    */
+  public server<T extends Server>(ctor: Constructor<T>, name?: string): Binding;
+  public server<T extends Server>(ctors: Constructor<T>[]): Binding[];
   public server<T extends Server>(
-    ctor: Constructor<T>,
+    ctor: Constructor<T> | Constructor<T>[],
     name?: string,
-  ): Binding {
-    const suffix = name || ctor.name;
-    const key = `${CoreBindings.SERVERS}.${suffix}`;
-    return this.bind(key)
-      .toClass(ctor)
-      .tag('server')
-      .inScope(BindingScope.SINGLETON);
-  }
-
-  /**
-   * Bind an array of Server constructors to the Application's master
-   * context.
-   * Each server added in this way will automatically be named based on the
-   * class constructor name with the "servers." prefix.
-   *
-   * If you wish to control the binding keys for particular server instances,
-   * use the app.server function instead.
-   * ```ts
-   * app.servers([
-   *  RestServer,
-   *  GRPCServer,
-   * ]);
-   * // Creates a binding for "servers.RestServer" and a binding for
-   * // "servers.GRPCServer";
-   * ```
-   *
-   * @param {Constructor<Server>[]} ctors An array of Server constructors.
-   * @returns {Binding[]} An array of bindings for the registered server classes
-   * @memberof Application
-   */
-  public servers<T extends Server>(ctors: Constructor<T>[]): Binding[] {
-    return ctors.map(ctor => this.server(ctor));
+  ): Binding | Binding[] {
+    if (!Array.isArray(ctor)) {
+      const suffix = name || ctor.name;
+      const key = `${CoreBindings.SERVERS}.${suffix}`;
+      return this.bind(key)
+        .toClass(ctor)
+        .tag('server')
+        .inScope(BindingScope.SINGLETON);
+    } else {
+      return ctor.map(server => this.server(server));
+    }
   }
 
   /**
@@ -187,10 +155,11 @@ export class Application extends Context {
   }
 
   /**
-   * Add a component to this application and register extensions such as
-   * controllers, providers, and servers from the component.
+   * Add a component or an array of components to this application
+   * and register extensions such as controllers, providers,
+   * and servers from the component.
    *
-   * @param componentCtor The component class to add.
+   * @param componentCtor The component class or an array of to add.
    * @param {string=} name Optional component name, default to the class name
    *
    * ```ts
@@ -207,39 +176,25 @@ export class Application extends Context {
    * app.component(ProductComponent);
    * ```
    */
-  public component(componentCtor: Constructor<Component>, name?: string) {
-    name = name || componentCtor.name;
-    const componentKey = `components.${name}`;
-    this.bind(componentKey)
-      .toClass(componentCtor)
-      .inScope(BindingScope.SINGLETON)
-      .tag('component');
-    // Assuming components can be synchronously instantiated
-    const instance = this.getSync(componentKey);
-    mountComponent(this, instance);
-  }
-
-  /**
-   * Add multiple components to this application and register their
-   * extensions.
-   *
-   * Each component added in this way will automatically be named based on the
-   * class constructor name with the "components." prefix.
-   *
-   * If you wish to control the binding keys for particular instances,
-   * use the app.component function instead.
-   * ```ts
-   * app.components([
-   *  RestComponent,
-   *  GRPCComponent,
-   * ]);
-   * // Creates a binding for "components.RestComponent" and a binding for
-   * // "components.GRPCComponent";
-   * ```
-   * @param ctors Array of components to add.
-   */
-  public components(ctors: Constructor<Component>[]) {
-    ctors.map(ctor => this.component(ctor));
+  public component(componentCtor: Constructor<Component>, name?: string): void;
+  public component(ctors: Constructor<Component>[]): void;
+  public component(
+    ctor: Constructor<Component> | Constructor<Component>[],
+    name?: string,
+  ) {
+    if (!Array.isArray(ctor)) {
+      name = name || ctor.name;
+      const componentKey = `components.${name}`;
+      this.bind(componentKey)
+        .toClass(ctor)
+        .inScope(BindingScope.SINGLETON)
+        .tag('component');
+      // Assuming components can be synchronously instantiated
+      const instance = this.getSync(componentKey);
+      mountComponent(this, instance);
+    } else {
+      ctor.map(component => this.component(component));
+    }
   }
 }
 

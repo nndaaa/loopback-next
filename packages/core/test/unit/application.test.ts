@@ -31,7 +31,7 @@ describe('Application', () => {
 
     it('binds multiple controllers passed in as an array', () => {
       const controllers = [MyController, MySecondController];
-      const bindings = app.controllers(controllers);
+      const bindings = app.controller(controllers);
 
       const bindA = bindings[0];
       expect(Array.from(bindA.tags)).to.containEql('controller');
@@ -76,7 +76,7 @@ describe('Application', () => {
     });
 
     it('binds multiple components passed in as an array', () => {
-      app.components([MyComponent, MySecondComponent]);
+      app.component([MyComponent, MySecondComponent]);
       expect(findKeysByTag(app, 'component')).to.containEql(
         'components.MyComponent',
       );
@@ -109,13 +109,13 @@ describe('Application', () => {
 
     it('allows binding of multiple servers as an array', async () => {
       const app = new Application();
-      const bindings = app.servers([FakeServer, FakerServer]);
+      const bindings = app.server([FakeServer, AnotherServer]);
       expect(Array.from(bindings[0].tags)).to.containEql('server');
       expect(Array.from(bindings[1].tags)).to.containEql('server');
       const fakeResult = await app.getServer(FakeServer);
       expect(fakeResult.constructor.name).to.equal(FakeServer.name);
-      const fakerResult = await app.getServer(FakerServer);
-      expect(fakerResult.constructor.name).to.equal(FakerServer.name);
+      const AnotherResult = await app.getServer(AnotherServer);
+      expect(AnotherResult.constructor.name).to.equal(AnotherServer.name);
     });
   });
 
@@ -138,4 +138,4 @@ class FakeServer extends Context implements Server {
   }
 }
 
-class FakerServer extends FakeServer {}
+class AnotherServer extends FakeServer {}
